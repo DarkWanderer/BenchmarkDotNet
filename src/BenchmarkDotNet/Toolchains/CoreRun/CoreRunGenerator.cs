@@ -1,5 +1,7 @@
 ﻿using System.IO;
 using System.Linq;
+using BenchmarkDotNet.Helpers;
+using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace BenchmarkDotNet.Toolchains.CoreRun
@@ -21,8 +23,8 @@ namespace BenchmarkDotNet.Toolchains.CoreRun
 
         protected override string GetPackagesDirectoryPath(string buildArtifactsDirectoryPath) => PackagesPath;
 
-        protected override string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, string configuration)
-            => Path.Combine(buildArtifactsDirectoryPath, "bin", configuration, TargetFrameworkMoniker, "publish");
+        protected override string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, BuildPartition buildPartition)
+            => Path.Combine(base.GetBinariesDirectoryPath(buildArtifactsDirectoryPath, buildPartition), "publish");
 
         protected override void CopyAllRequiredFiles(ArtifactsPaths artifactsPaths)
         {

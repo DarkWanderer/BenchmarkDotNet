@@ -5,7 +5,7 @@ using BenchmarkDotNet.Extensions;
 using BenchmarkDotNet.Jobs;
 using Xunit;
 
-namespace BenchmarkDotNet.IntegrationTests
+namespace BenchmarkDotNet.IntegrationTests.ManualRunning
 {
     public class MultipleFrameworksTest : BenchmarkTestExecutor
     {

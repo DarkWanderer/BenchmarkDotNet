@@ -45,7 +45,7 @@ namespace BenchmarkDotNet.Toolchains
         /// <summary>
         /// returns a path where executable should be found after the build
         /// </summary>
-        [PublicAPI] protected virtual string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, string configuration)
+        [PublicAPI] protected virtual string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, BuildPartition buildPartition)
             => buildArtifactsDirectoryPath;
 
         /// <summary>
@@ -120,7 +120,7 @@ namespace BenchmarkDotNet.Toolchains
 
             string programName = buildPartition.ProgramName;
             string buildArtifactsDirectoryPath = GetBuildArtifactsDirectoryPath(buildPartition, programName);
-            string binariesDirectoryPath = GetBinariesDirectoryPath(buildArtifactsDirectoryPath, buildPartition.BuildConfiguration);
+            string binariesDirectoryPath = GetBinariesDirectoryPath(buildArtifactsDirectoryPath, buildPartition);
 
             string executablePath = GetExecutablePath(binariesDirectoryPath, programName);
 

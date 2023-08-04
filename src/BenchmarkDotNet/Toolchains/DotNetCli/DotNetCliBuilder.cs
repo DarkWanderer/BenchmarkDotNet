@@ -14,15 +14,15 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
 
         private string CustomDotNetCliPath { get; }
         private bool LogOutput { get; }
-        private bool RetryFailedBuildWithNoDeps { get; }
+        private bool RetryFailedBuildWithOutputPath { get; }
 
         [PublicAPI]
-        public DotNetCliBuilder(string targetFrameworkMoniker, string customDotNetCliPath = null, bool logOutput = false, bool retryFailedBuildWithNoDeps = true)
+        public DotNetCliBuilder(string targetFrameworkMoniker, string customDotNetCliPath = null, bool logOutput = false, bool retryFailedBuildWithOutputPath = true)
         {
             TargetFrameworkMoniker = targetFrameworkMoniker;
             CustomDotNetCliPath = customDotNetCliPath;
             LogOutput = logOutput;
-            RetryFailedBuildWithNoDeps = retryFailedBuildWithNoDeps;
+            RetryFailedBuildWithOutputPath = retryFailedBuildWithOutputPath;
         }
 
         public BuildResult Build(GenerateResult generateResult, BuildPartition buildPartition, ILogger logger)
@@ -36,7 +36,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                     Array.Empty<EnvironmentVariable>(),
                     buildPartition.Timeout,
                     logOutput: LogOutput,
-                    retryFailedBuildWithNoDeps: RetryFailedBuildWithNoDeps)
+                    retryFailedBuildWithOutputPath: RetryFailedBuildWithOutputPath)
                 .RestoreThenBuild();
             if (buildResult.IsBuildSuccess &&
                 buildPartition.RepresentativeBenchmarkCase.Job.Environment.LargeAddressAware)

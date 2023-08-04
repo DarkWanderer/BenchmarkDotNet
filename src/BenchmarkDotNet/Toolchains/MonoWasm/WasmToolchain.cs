@@ -50,7 +50,7 @@ namespace BenchmarkDotNet.Toolchains.MonoWasm
                         netCoreAppSettings.CustomDotNetCliPath,
                         // aot builds can be very slow
                         logOutput: netCoreAppSettings.AOTCompilerMode == MonoAotLLVM.MonoAotCompilerMode.wasm,
-                        retryFailedBuildWithNoDeps: false),
+                        retryFailedBuildWithOutputPath: false),
                     new WasmExecutor(),
                     netCoreAppSettings.CustomDotNetCliPath);
     }

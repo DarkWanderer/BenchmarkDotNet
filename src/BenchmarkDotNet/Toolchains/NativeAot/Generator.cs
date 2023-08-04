@@ -62,8 +62,8 @@ namespace BenchmarkDotNet.Toolchains.NativeAot
                 ? Path.Combine(Path.GetTempPath(), programName) // store everything in temp to avoid collisions with IDE
                 : base.GetBuildArtifactsDirectoryPath(buildPartition, programName);
 
-        protected override string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, string configuration)
-            => Path.Combine(buildArtifactsDirectoryPath, "bin", configuration, TargetFrameworkMoniker, runtimeIdentifier, "publish");
+        protected override string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, BuildPartition buildPartition)
+            => Path.Combine(base.GetBinariesDirectoryPath(buildArtifactsDirectoryPath, buildPartition), runtimeIdentifier, "publish");
 
         protected override void GenerateBuildScript(BuildPartition buildPartition, ArtifactsPaths artifactsPaths)
         {
@@ -71,7 +71,6 @@ namespace BenchmarkDotNet.Toolchains.NativeAot
 
             var content = new StringBuilder(300)
                 .AppendLine($"call {CliPath ?? "dotnet"} {DotNetCliCommand.GetRestoreCommand(artifactsPaths, buildPartition, extraArguments)}")
-                .AppendLine($"call {CliPath ?? "dotnet"} {DotNetCliCommand.GetBuildCommand(artifactsPaths, buildPartition, extraArguments)}")
                 .AppendLine($"call {CliPath ?? "dotnet"} {DotNetCliCommand.GetPublishCommand(artifactsPaths, buildPartition, extraArguments)}")
                 .ToString();
 

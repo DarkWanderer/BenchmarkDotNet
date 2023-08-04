@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using BenchmarkDotNet.Characteristics;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Environments;
@@ -14,19 +15,30 @@ namespace BenchmarkDotNet.Running
 {
     public class BuildPartition
     {
+        private static int s_id;
+
         public BuildPartition(BenchmarkBuildInfo[] benchmarks, IResolver resolver)
         {
+            var guid = Guid.NewGuid();
             Resolver = resolver;
             RepresentativeBenchmarkCase = benchmarks[0].BenchmarkCase;
             Benchmarks = benchmarks;
-            ProgramName = benchmarks[0].Config.Options.IsSet(ConfigOptions.KeepBenchmarkFiles) ? RepresentativeBenchmarkCase.Job.FolderInfo : Guid.NewGuid().ToString();
+            ProgramName = benchmarks[0].Config.Options.IsSet(ConfigOptions.KeepBenchmarkFiles) ? RepresentativeBenchmarkCase.Job.FolderInfo : guid.ToString();
             LogBuildOutput = benchmarks[0].Config.Options.IsSet(ConfigOptions.LogBuildOutput);
             GenerateMSBuildBinLog = benchmarks[0].Config.Options.IsSet(ConfigOptions.GenerateMSBuildBinLog);
+
+            int id = Interlocked.Increment(ref s_id);
+            Id = $"{id}_";
+            var random = new Random(guid.GetHashCode());
+            for (int i = 0; i < 6; i++)
+                Id += (char) ('A' + random.Next(26));
         }
 
         public BenchmarkBuildInfo[] Benchmarks { get; }
 
         public string ProgramName { get; }
+
+        public string Id { get; }
 
         /// <summary>
         /// the benchmarks are grouped by the build settings
