@@ -21,7 +21,7 @@ namespace BenchmarkDotNet.IntegrationTests.ManualRunning
                     .WithArguments(new Argument[] { new MsBuildArgument($"/p:CustomProp={setCustomProperty}") })
                     .WithEnvironmentVariable(CustomPropEnvVarName, setCustomProperty.ToString())
                 );
-            CanExecute<ValuePerTfm>(config);
+            CanExecute<PropertyDefine>(config);
         }
 
         [Fact]
@@ -40,10 +40,10 @@ namespace BenchmarkDotNet.IntegrationTests.ManualRunning
                 .AddJob(Job.Dry
                     .WithEnvironmentVariable(CustomPropEnvVarName, false.ToString())
                 );
-            CanExecute<ValuePerTfm>(config);
+            CanExecute<PropertyDefine>(config);
         }
 
-        public class ValuePerTfm
+        public class PropertyDefine
         {
             private const bool customPropWasSet =
 #if CUSTOM_PROP

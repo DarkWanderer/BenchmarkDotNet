@@ -1,12 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.IO;
 using System.Linq;
 using System.Text;
 using BenchmarkDotNet.Characteristics;
 using BenchmarkDotNet.Extensions;
-using BenchmarkDotNet.Helpers;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Portability;
@@ -33,9 +30,6 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
         [PublicAPI] public TimeSpan Timeout { get; }
 
         [PublicAPI] public bool LogOutput { get; }
-
-        [Obsolete("Building with no dependencies is no longer supported.", false), EditorBrowsable(EditorBrowsableState.Never)]
-        public bool RetryFailedBuildWithNoDeps => false;
 
         public DotNetCliCommand(string cliPath, string arguments, GenerateResult generateResult, ILogger logger,
             BuildPartition buildPartition, IReadOnlyList<EnvironmentVariable> environmentVariables, TimeSpan timeout, bool logOutput = false)
@@ -77,11 +71,11 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
 
             // On our CI, Integration tests take too much time, because each benchmark run rebuilds BenchmarkDotNet itself.
             // To reduce the total duration of the CI workflows, we build all the projects without dependencies
-            if (XUnitHelper.ForceNoDependenciesForCore)
+            if (BuildPartition.ForcedNoDependenciesForIntegrationTests)
             {
-#pragma warning disable CS0618 // Type or member is obsolete
-                return BuildNoRestoreNoDependencies().ToBuildResult(GenerateResult);
-#pragma warning restore CS0618 // Type or member is obsolete
+                return DotNetCliCommandExecutor.Execute(WithArguments(
+                    GetBuildCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore --no-dependencies", "build-no-restore-no-deps", excludeOutput: true)))
+                    .ToBuildResult(GenerateResult);
             }
 
             // We no longer retry with --no-dependencies, because it fails with --output set at the same time,
@@ -137,11 +131,6 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
         public DotNetCliCommandResult BuildNoRestore()
             => DotNetCliCommandExecutor.Execute(WithArguments(
                 GetBuildCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore", "build-no-restore")));
-
-        [Obsolete("Building with no dependencies is no longer supported, and will probably fail.", false), EditorBrowsable(EditorBrowsableState.Never)]
-        public DotNetCliCommandResult BuildNoRestoreNoDependencies()
-            => DotNetCliCommandExecutor.Execute(WithArguments(
-                GetBuildCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore --no-dependencies", "build-no-restore-no-deps", excludeOutput: true)));
 
         public DotNetCliCommandResult Publish()
             => DotNetCliCommandExecutor.Execute(WithArguments(

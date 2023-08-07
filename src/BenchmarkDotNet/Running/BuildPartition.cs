@@ -5,8 +5,12 @@ using System.Threading;
 using BenchmarkDotNet.Characteristics;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Environments;
+using BenchmarkDotNet.Helpers;
 using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Portability;
+using BenchmarkDotNet.Toolchains;
 using BenchmarkDotNet.Toolchains.CsProj;
+using BenchmarkDotNet.Toolchains.DotNetCli;
 using BenchmarkDotNet.Toolchains.MonoWasm;
 using BenchmarkDotNet.Toolchains.Roslyn;
 using JetBrains.Annotations;
@@ -27,8 +31,7 @@ namespace BenchmarkDotNet.Running
             LogBuildOutput = benchmarks[0].Config.Options.IsSet(ConfigOptions.LogBuildOutput);
             GenerateMSBuildBinLog = benchmarks[0].Config.Options.IsSet(ConfigOptions.GenerateMSBuildBinLog);
 
-            int id = Interlocked.Increment(ref s_id);
-            Id = $"{id}_";
+            Id = $"{Interlocked.Increment(ref s_id)}_";
             var random = new Random(guid.GetHashCode());
             for (int i = 0; i < 6; i++)
                 Id += (char) ('A' + random.Next(26));
@@ -83,5 +86,24 @@ namespace BenchmarkDotNet.Running
             // in case of SingleFile, location.Length returns 0, so we use GetName() and
             // manually construct the path.
             assembly.Location.Length == 0 ? Path.Combine(AppContext.BaseDirectory, assembly.GetName().Name) : assembly.Location;
+
+        internal bool ForcedNoDependenciesForIntegrationTests
+        {
+            get
+            {
+                if (!XUnitHelper.IsIntegrationTest.Value || !RuntimeInformation.IsNetCore)
+                    return false;
+
+                var job = RepresentativeBenchmarkCase.Job;
+                if (job.GetToolchain().Builder is not DotNetCliBuilder)
+                    return false;
+
+                bool hasDynamicBuildCharacteristic = job.HasValue(InfrastructureMode.NuGetReferencesCharacteristic)
+                    || job.HasValue(InfrastructureMode.BuildConfigurationCharacteristic)
+                    || job.HasValue(InfrastructureMode.ArgumentsCharacteristic);
+
+                return !hasDynamicBuildCharacteristic;
+            }
+        }
     }
 }

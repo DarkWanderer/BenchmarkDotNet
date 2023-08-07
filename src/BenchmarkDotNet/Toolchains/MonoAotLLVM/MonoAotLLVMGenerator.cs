@@ -59,7 +59,7 @@ namespace BenchmarkDotNet.Toolchains.MonoAotLLVM
                 : Path.Combine(binariesDirectoryPath, programName);
 
         protected override string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, BuildPartition buildPartition)
-            => XUnitHelper.ForceNoDependenciesForCore
+            => buildPartition.ForcedNoDependenciesForIntegrationTests
             ? Path.Combine(buildArtifactsDirectoryPath, "bin", TargetFrameworkMoniker, CustomDotNetCliToolchainBuilder.GetPortableRuntimeIdentifier(), "publish")
             : Path.Combine(base.GetBinariesDirectoryPath(buildArtifactsDirectoryPath, buildPartition), CustomDotNetCliToolchainBuilder.GetPortableRuntimeIdentifier(), "publish");
     }

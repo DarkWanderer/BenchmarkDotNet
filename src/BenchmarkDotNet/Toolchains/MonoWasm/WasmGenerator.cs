@@ -69,7 +69,7 @@ namespace BenchmarkDotNet.Toolchains.MonoWasm
         protected override string GetExecutablePath(string binariesDirectoryPath, string programName) => Path.Combine(binariesDirectoryPath, MainJS);
 
         protected override string GetBinariesDirectoryPath(string buildArtifactsDirectoryPath, BuildPartition buildPartition)
-            => XUnitHelper.ForceNoDependenciesForCore
+            => buildPartition.ForcedNoDependenciesForIntegrationTests
             ? Path.Combine(buildArtifactsDirectoryPath, "bin", TargetFrameworkMoniker, "browser-wasm", "AppBundle")
             : Path.Combine(base.GetBinariesDirectoryPath(buildArtifactsDirectoryPath, buildPartition), "browser-wasm", "AppBundle");
     }
