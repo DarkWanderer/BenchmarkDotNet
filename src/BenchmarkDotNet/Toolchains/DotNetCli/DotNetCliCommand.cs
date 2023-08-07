@@ -175,11 +175,11 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 .AppendArgument(GetMsBuildBinLogArgument(buildPartition, binLogSuffix))
                 // Fix #1377 (see comments in #1773).
                 // We force the project to output binaries to a new directory.
-                // Specifying --output and --no-dependencies breaks the build for some reason,
+                // Specifying --output and --no-dependencies breaks the build (because the previous build was not done using the custom output path),
                 // so we don't include it if we're building no-deps (only supported for integration tests).
                 .AppendArgument(excludeOutput ? string.Empty : $"--output \"{artifactsPaths.BinariesDirectoryPath}\"")
-                .AppendArgument(excludeOutput ? string.Empty : $"/p:OutputPath={Path.Combine(".", "bin", $"bdn_partition_{buildPartition.Id}")}")
-                .AppendArgument(excludeOutput ? string.Empty : $"/p:IntermediateOutputPath={Path.Combine(".", "obj", $"bdn_partition_{buildPartition.Id}")}\\")
+                .AppendArgument(excludeOutput ? string.Empty : $"/p:OutputPath=\"{artifactsPaths.BinariesDirectoryPath}\"")
+                .AppendArgument(excludeOutput ? string.Empty : $"/p:IntermediateOutputPath=\"{artifactsPaths.IntermediateDirectoryPath}\"\\")
                 .ToString();
 
         internal static string GetPublishCommand(ArtifactsPaths artifactsPaths, BuildPartition buildPartition, string extraArguments = null, string binLogSuffix = null)
@@ -191,8 +191,8 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 .AppendArgument(string.IsNullOrEmpty(artifactsPaths.PackagesDirectoryName) ? string.Empty : $"/p:NuGetPackageRoot=\"{artifactsPaths.PackagesDirectoryName}\"")
                 .AppendArgument(GetMsBuildBinLogArgument(buildPartition, binLogSuffix))
                 .AppendArgument($"--output \"{artifactsPaths.BinariesDirectoryPath}\"")
-                .AppendArgument($"/p:OutputPath={Path.Combine(".", "bin", $"bdn_partition_{buildPartition.Id}")}")
-                .AppendArgument($"/p:IntermediateOutputPath={Path.Combine(".", "obj", $"bdn_partition_{buildPartition.Id}")}\\")
+                .AppendArgument($"/p:OutputPath=\"{artifactsPaths.BinariesDirectoryPath}\"")
+                .AppendArgument($"/p:IntermediateOutputPath=\"{artifactsPaths.IntermediateDirectoryPath}\"\\")
                 .ToString();
 
         private static string GetMsBuildBinLogArgument(BuildPartition buildPartition, string suffix)
