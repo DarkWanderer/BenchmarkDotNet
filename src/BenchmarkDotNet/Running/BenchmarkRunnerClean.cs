@@ -20,7 +20,6 @@ using BenchmarkDotNet.Mathematics;
 using BenchmarkDotNet.Portability;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Toolchains;
-using BenchmarkDotNet.Toolchains.DotNetCli;
 using BenchmarkDotNet.Toolchains.Parameters;
 using BenchmarkDotNet.Toolchains.Results;
 using BenchmarkDotNet.Validators;
@@ -348,83 +347,31 @@ namespace BenchmarkDotNet.Running
             return validationErrors.ToImmutableArray();
         }
 
-        private static bool IsDynamic(this BuildPartition buildPartition, out bool isDotnetCli)
-        {
-            // Roslyn/Mono toolchains are always safe to build in parallel, so we only check for dotnet cli.
-            var job = buildPartition.RepresentativeBenchmarkCase.Job;
-            isDotnetCli = job.GetToolchain().Builder is DotNetCliBuilder;
-            return isDotnetCli
-                && (job.HasValue(InfrastructureMode.NuGetReferencesCharacteristic)
-                || job.HasValue(InfrastructureMode.BuildConfigurationCharacteristic)
-                || job.HasValue(InfrastructureMode.ArgumentsCharacteristic));
-        }
-
         private static Dictionary<BuildPartition, BuildResult> BuildInParallel(ILogger logger, string rootArtifactsFolderPath, BuildPartition[] buildPartitions, in StartedClock globalChronometer)
         {
-            // Partitions that contain dynamic modifications are unsafe to build in parallel,
-            // not because the builds will fail (though they might), but because properties can be overwritten and give incorrect results. (See comments in #1773)
-            // We build them sequentially after the parallel builds.
-            var parallelPartitions = new List<BuildPartition>(buildPartitions.Length);
-            var sequentialPartitions = new List<BuildPartition>(buildPartitions.Length);
+            logger.WriteLineHeader($"// ***** Building {buildPartitions.Length} exe(s) in Parallel: Start   *****");
 
-            bool buildingStaticDotnetCli = false;
-            foreach (var buildPartition in buildPartitions)
-            {
-                if (buildPartition.IsDynamic(out bool isDotnetCli))
-                {
-                    sequentialPartitions.Add(buildPartition);
-                }
-                else
-                {
-                    buildingStaticDotnetCli |= isDotnetCli;
-                    parallelPartitions.Add(buildPartition);
-                }
-            }
-            // We can build 1 dotnet cli dynamic partition in parallel if no dotnet cli static partitions are being built.
-            if (!buildingStaticDotnetCli && sequentialPartitions.Count > 0)
-            {
-                parallelPartitions.Add(sequentialPartitions[sequentialPartitions.Count - 1]);
-                sequentialPartitions.RemoveAt(sequentialPartitions.Count - 1);
-            }
-
-            logger.WriteLineHeader($"// ***** Building {parallelPartitions.Count} exe(s) in Parallel and {sequentialPartitions.Count} exe(s) Sequentially: Start   *****");
-
-            var buildLogger = parallelPartitions.Count <= 1 ? logger : NullLogger.Instance; // When we have just one or zero parallel partitions, we can print to std out.
+            var buildLogger = buildPartitions.Length == 1 ? logger : NullLogger.Instance; // when we have just one partition we can print to std out
 
             var beforeParallelBuild = globalChronometer.GetElapsed();
 
-            var buildResults = parallelPartitions
+            var buildResults = buildPartitions
                 .AsParallel()
                 .Select(buildPartition => (buildPartition, buildResult: Build(buildPartition, rootArtifactsFolderPath, buildLogger)))
                 .ToDictionary(result => result.buildPartition, result => result.buildResult);
 
             var afterParallelBuild = globalChronometer.GetElapsed();
 
-            bool returnImmediately = parallelPartitions.Count <= 1 || !buildResults.Values.Any(result => result.IsGenerateSuccess && !result.IsBuildSuccess);
-
-            foreach (var sequentialPartition in sequentialPartitions)
-            {
-                var buildResult = Build(sequentialPartition, rootArtifactsFolderPath, buildLogger);
-                buildResults.Add(sequentialPartition, buildResult);
-            }
-
             logger.WriteLineHeader($"// ***** Done, took {GetFormattedDifference(beforeParallelBuild, afterParallelBuild)}   *****");
 
-            if (returnImmediately)
+            if (buildPartitions.Length <= 1 || !buildResults.Values.Any(result => result.IsGenerateSuccess && !result.IsBuildSuccess))
                 return buildResults;
 
             logger.WriteLineHeader("// ***** Failed to build in Parallel, switching to sequential build   *****");
 
             foreach (var buildPartition in buildPartitions)
-            {
-                if (!sequentialPartitions.Contains(buildPartition)
-                    && buildResults[buildPartition].IsGenerateSuccess
-                    && !buildResults[buildPartition].IsBuildSuccess
-                    && !buildResults[buildPartition].TryToExplainFailureReason(out string _))
-                {
+                if (buildResults[buildPartition].IsGenerateSuccess && !buildResults[buildPartition].IsBuildSuccess && !buildResults[buildPartition].TryToExplainFailureReason(out string _))
                     buildResults[buildPartition] = Build(buildPartition, rootArtifactsFolderPath, buildLogger);
-                }
-            }
 
             var afterSequentialBuild = globalChronometer.GetElapsed();
 

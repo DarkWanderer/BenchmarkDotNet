@@ -36,11 +36,9 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
 
         [Obsolete("Building with no dependencies is no longer supported.", false), EditorBrowsable(EditorBrowsableState.Never)]
         public bool RetryFailedBuildWithNoDeps => false;
-        private bool RetryFailedBuildWithOutputPath { get; }
 
         public DotNetCliCommand(string cliPath, string arguments, GenerateResult generateResult, ILogger logger,
-            BuildPartition buildPartition, IReadOnlyList<EnvironmentVariable> environmentVariables, TimeSpan timeout, bool logOutput = false,
-            bool retryFailedBuildWithOutputPath = true)
+            BuildPartition buildPartition, IReadOnlyList<EnvironmentVariable> environmentVariables, TimeSpan timeout, bool logOutput = false)
         {
             CliPath = cliPath ?? DotNetCliCommandExecutor.DefaultDotNetCliPath.Value;
             Arguments = arguments;
@@ -50,7 +48,6 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
             EnvironmentVariables = environmentVariables;
             Timeout = timeout;
             LogOutput = logOutput || (buildPartition is not null && buildPartition.LogBuildOutput);
-            RetryFailedBuildWithOutputPath = retryFailedBuildWithOutputPath;
         }
 
         public DotNetCliCommand WithArguments(string arguments)
@@ -78,7 +75,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
             if (!restoreResult.IsSuccess)
                 return BuildResult.Failure(GenerateResult, restoreResult.AllInformation);
 
-            // On our CI , Integration tests take too much time, because each benchmark run rebuilds BenchmarkDotNet itself.
+            // On our CI, Integration tests take too much time, because each benchmark run rebuilds BenchmarkDotNet itself.
             // To reduce the total duration of the CI workflows, we build all the projects without dependencies
             if (XUnitHelper.ForceNoDependenciesForCore)
             {
@@ -87,15 +84,9 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
 #pragma warning restore CS0618 // Type or member is obsolete
             }
 
-            var buildResult = BuildNoRestore();
-
-            if (!buildResult.IsSuccess && RetryFailedBuildWithOutputPath) // If we fail to do the build with --output, we try with /p:OutputPath.
-                // We no longer retry with --no-dependencies, because it fails with --output set at the same time,
-                // and the artifactsPaths.BinariesDirectoryPath is set before we try to build, so we cannot overwrite it,
-                // so we retry with /p:OutputPath instead.
-                buildResult = BuildNoRestoreWithOutputPath();
-
-            return buildResult.ToBuildResult(GenerateResult);
+            // We no longer retry with --no-dependencies, because it fails with --output set at the same time,
+            // and the artifactsPaths.BinariesDirectoryPath is set before we try to build, so we cannot overwrite it.
+            return BuildNoRestore().ToBuildResult(GenerateResult);
         }
 
         [PublicAPI]
@@ -118,11 +109,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 return BuildResult.Failure(GenerateResult, restoreResult.AllInformation);
 
             // We use the implicit build in the publish command. We stopped doing a separate build step because we set the --output.
-            var buildResult = PublishNoRestore();
-            if (!buildResult.IsSuccess && RetryFailedBuildWithOutputPath) // If we fail to do the build with --output, we try with /p:OutputPath.
-                buildResult = PublishNoRestoreWithOutputPath();
-
-            return buildResult.ToBuildResult(GenerateResult);
+            return PublishNoRestore().ToBuildResult(GenerateResult);
         }
 
         public DotNetCliCommandResult AddPackages()
@@ -151,10 +138,6 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
             => DotNetCliCommandExecutor.Execute(WithArguments(
                 GetBuildCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore", "build-no-restore")));
 
-        public DotNetCliCommandResult BuildNoRestoreWithOutputPath()
-            => DotNetCliCommandExecutor.Execute(WithArguments(
-                GetBuildCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore /p:OutputPath={Path.Combine(".", "bin", $"bdn_partition_{BuildPartition.Id}")}", "build-no-restore-with-output")));
-
         [Obsolete("Building with no dependencies is no longer supported, and will probably fail.", false), EditorBrowsable(EditorBrowsableState.Never)]
         public DotNetCliCommandResult BuildNoRestoreNoDependencies()
             => DotNetCliCommandExecutor.Execute(WithArguments(
@@ -168,10 +151,6 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
         public DotNetCliCommandResult PublishNoRestore()
             => DotNetCliCommandExecutor.Execute(WithArguments(
                 GetPublishCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore", "publish-no-restore")));
-
-        public DotNetCliCommandResult PublishNoRestoreWithOutputPath()
-            => DotNetCliCommandExecutor.Execute(WithArguments(
-                GetPublishCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore /p:OutputPath={Path.Combine(".", "bin", $"bdn_partition_{BuildPartition.Id}")}", "publish-no-restore-with-output")));
 
         internal static IEnumerable<string> GetAddPackagesCommands(BuildPartition buildPartition)
             => GetNuGetAddPackageCommands(buildPartition.RepresentativeBenchmarkCase, buildPartition.Resolver);
@@ -199,6 +178,8 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 // Specifying --output and --no-dependencies breaks the build for some reason,
                 // so we don't include it if we're building no-deps (only supported for integration tests).
                 .AppendArgument(excludeOutput ? string.Empty : $"--output \"{artifactsPaths.BinariesDirectoryPath}\"")
+                .AppendArgument(excludeOutput ? string.Empty : $"/p:OutputPath={Path.Combine(".", "bin", $"bdn_partition_{buildPartition.Id}")}")
+                .AppendArgument(excludeOutput ? string.Empty : $"/p:IntermediateOutputPath={Path.Combine(".", "obj", $"bdn_partition_{buildPartition.Id}")}\\")
                 .ToString();
 
         internal static string GetPublishCommand(ArtifactsPaths artifactsPaths, BuildPartition buildPartition, string extraArguments = null, string binLogSuffix = null)
@@ -210,6 +191,8 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 .AppendArgument(string.IsNullOrEmpty(artifactsPaths.PackagesDirectoryName) ? string.Empty : $"/p:NuGetPackageRoot=\"{artifactsPaths.PackagesDirectoryName}\"")
                 .AppendArgument(GetMsBuildBinLogArgument(buildPartition, binLogSuffix))
                 .AppendArgument($"--output \"{artifactsPaths.BinariesDirectoryPath}\"")
+                .AppendArgument($"/p:OutputPath={Path.Combine(".", "bin", $"bdn_partition_{buildPartition.Id}")}")
+                .AppendArgument($"/p:IntermediateOutputPath={Path.Combine(".", "obj", $"bdn_partition_{buildPartition.Id}")}\\")
                 .ToString();
 
         private static string GetMsBuildBinLogArgument(BuildPartition buildPartition, string suffix)
