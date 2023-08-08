@@ -66,7 +66,9 @@ namespace BenchmarkDotNet.Toolchains.CsProj
             : Path.Combine(buildArtifactsDirectoryPath, "bin", $"bdn_partition_{buildPartition.Id}");
 
         protected override string GetIntermediateDirectoryPath(string buildArtifactsDirectoryPath, BuildPartition buildPartition)
-            => Path.Combine(buildArtifactsDirectoryPath, "obj", $"bdn_partition_{buildPartition.Id}");
+            => buildPartition.ForcedNoDependenciesForIntegrationTests
+            ? Path.Combine(buildArtifactsDirectoryPath, "obj", buildPartition.BuildConfiguration, TargetFrameworkMoniker)
+            : Path.Combine(buildArtifactsDirectoryPath, "obj", $"bdn_partition_{buildPartition.Id}");
 
         [SuppressMessage("ReSharper", "StringLiteralTypo")] // R# complains about $variables$
         protected override void GenerateProject(BuildPartition buildPartition, ArtifactsPaths artifactsPaths, ILogger logger)
