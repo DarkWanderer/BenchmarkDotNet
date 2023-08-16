@@ -162,13 +162,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 .AppendArgument(GetMandatoryMsBuildSettings(buildPartition.BuildConfiguration))
                 .AppendArgument(string.IsNullOrEmpty(artifactsPaths.PackagesDirectoryName) ? string.Empty : $"/p:NuGetPackageRoot=\"{artifactsPaths.PackagesDirectoryName}\"")
                 .AppendArgument(GetMsBuildBinLogArgument(buildPartition, binLogSuffix))
-                // Fix #1377 (see comments in #1773).
-                // We force the project to output binaries to a new directory.
-                // Specifying --output and --no-dependencies breaks the build (because the previous build was not done using the custom output path),
-                // so we don't include it if we're building no-deps (only supported for integration tests).
-                .AppendArgument(excludeOutput ? string.Empty : $"--output \"{artifactsPaths.BinariesDirectoryPath}\"")
-                .AppendArgument(excludeOutput ? string.Empty : $"/p:OutputPath=\"{artifactsPaths.BinariesDirectoryPath}\"")
-                .AppendArgument(excludeOutput ? string.Empty : $"/p:IntermediateOutputPath=\"{artifactsPaths.IntermediateDirectoryPath}\"\\")
+                .MaybeAppendOutputPaths(artifactsPaths, excludeOutput)
                 .ToString();
 
         internal static string GetPublishCommand(ArtifactsPaths artifactsPaths, BuildPartition buildPartition, string extraArguments = null, string binLogSuffix = null)
@@ -179,9 +173,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 .AppendArgument(GetMandatoryMsBuildSettings(buildPartition.BuildConfiguration))
                 .AppendArgument(string.IsNullOrEmpty(artifactsPaths.PackagesDirectoryName) ? string.Empty : $"/p:NuGetPackageRoot=\"{artifactsPaths.PackagesDirectoryName}\"")
                 .AppendArgument(GetMsBuildBinLogArgument(buildPartition, binLogSuffix))
-                .AppendArgument($"--output \"{artifactsPaths.BinariesDirectoryPath}\"")
-                .AppendArgument($"/p:OutputPath=\"{artifactsPaths.BinariesDirectoryPath}\"")
-                .AppendArgument($"/p:IntermediateOutputPath=\"{artifactsPaths.IntermediateDirectoryPath}\"\\")
+                .MaybeAppendOutputPaths(artifactsPaths)
                 .ToString();
 
         private static string GetMsBuildBinLogArgument(BuildPartition buildPartition, string suffix)
@@ -248,5 +240,22 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
             }
             return commandBuilder.ToString();
         }
+    }
+
+    internal static class DotNetCliCommandExtensions
+    {
+        // Fix #1377 (see comments in #1773).
+        // We force the project to output binaries to a new directory.
+        // Specifying --output and --no-dependencies breaks the build (because the previous build was not done using the custom output path),
+        // so we don't include it if we're building no-deps (only supported for integration tests).
+        internal static StringBuilder MaybeAppendOutputPaths(this StringBuilder stringBuilder, ArtifactsPaths artifactsPaths, bool excludeOutput = false)
+            => excludeOutput
+                ? stringBuilder
+                : stringBuilder
+                    .AppendArgument($"/p:IntermediateOutputPath=\"{artifactsPaths.IntermediateDirectoryPath}\"\\")
+                    .AppendArgument($"/p:OutDir=\"{artifactsPaths.BinariesDirectoryPath}\"")
+                    // OutputPath is legacy, per-project version of OutDir. We set both just in case. https://github.com/dotnet/msbuild/issues/87
+                    .AppendArgument($"/p:OutputPath=\"{artifactsPaths.BinariesDirectoryPath}\"")
+                    .AppendArgument($"--output \"{artifactsPaths.BinariesDirectoryPath}\"");
     }
 }
