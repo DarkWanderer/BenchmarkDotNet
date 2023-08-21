@@ -16,8 +16,8 @@ namespace BenchmarkDotNet.Disassemblers
     {
         // Translating an address to a method can cause AV and a process crash (https://github.com/dotnet/BenchmarkDotNet/issues/2070).
         // It was fixed in https://github.com/dotnet/runtime/pull/79846,
-        // and backported to 7.0.3 (https://github.com/dotnet/runtime/pull/79862).
-        protected static readonly bool IsVulnerableToAvInDac = !RuntimeInformation.IsWindows() && Environment.Version < new Version(7, 0, 3);
+        // and most likely will be backported to 7.0.2 very soon (https://github.com/dotnet/runtime/pull/79862).
+        protected static readonly bool IsVulnerableToAvInDac = !RuntimeInformation.IsWindows() && Environment.Version < new Version(7, 0, 2);
 
         internal DisassemblyResult AttachAndDisassemble(Settings settings)
         {
