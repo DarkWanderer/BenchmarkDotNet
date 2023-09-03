@@ -65,22 +65,29 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
             if (BuildPartition.IsCustomBuildConfiguration)
                 return Build().ToBuildResult(GenerateResult);
 
-            var restoreResult = Restore();
-            if (!restoreResult.IsSuccess)
-                return BuildResult.Failure(GenerateResult, restoreResult.AllInformation);
-
             // On our CI, Integration tests take too much time, because each benchmark run rebuilds BenchmarkDotNet itself.
             // To reduce the total duration of the CI workflows, we build all the projects without dependencies
             if (BuildPartition.ForcedNoDependenciesForIntegrationTests)
             {
+                var restoreResult = DotNetCliCommandExecutor.Execute(WithArguments(
+                    GetRestoreCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-dependencies", "restore-no-deps", excludeOutput: true)));
+                if (!restoreResult.IsSuccess)
+                    return BuildResult.Failure(GenerateResult, restoreResult.AllInformation);
+
                 return DotNetCliCommandExecutor.Execute(WithArguments(
                     GetBuildCommand(GenerateResult.ArtifactsPaths, BuildPartition, $"{Arguments} --no-restore --no-dependencies", "build-no-restore-no-deps", excludeOutput: true)))
                     .ToBuildResult(GenerateResult);
             }
+            else
+            {
+                var restoreResult = Restore();
+                if (!restoreResult.IsSuccess)
+                    return BuildResult.Failure(GenerateResult, restoreResult.AllInformation);
 
-            // We no longer retry with --no-dependencies, because it fails with --output set at the same time,
-            // and the artifactsPaths.BinariesDirectoryPath is set before we try to build, so we cannot overwrite it.
-            return BuildNoRestore().ToBuildResult(GenerateResult);
+                // We no longer retry with --no-dependencies, because it fails with --output set at the same time,
+                // and the artifactsPaths.BinariesDirectoryPath is set before we try to build, so we cannot overwrite it.
+                return BuildNoRestore().ToBuildResult(GenerateResult);
+            }
         }
 
         [PublicAPI]
@@ -144,7 +151,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
         internal static IEnumerable<string> GetAddPackagesCommands(BuildPartition buildPartition)
             => GetNuGetAddPackageCommands(buildPartition.RepresentativeBenchmarkCase, buildPartition.Resolver);
 
-        internal static string GetRestoreCommand(ArtifactsPaths artifactsPaths, BuildPartition buildPartition, string extraArguments = null, string binLogSuffix = null)
+        internal static string GetRestoreCommand(ArtifactsPaths artifactsPaths, BuildPartition buildPartition, string extraArguments = null, string binLogSuffix = null, bool excludeOutput = false)
             => new StringBuilder()
                 .AppendArgument("restore")
                 .AppendArgument(string.IsNullOrEmpty(artifactsPaths.PackagesDirectoryName) ? string.Empty : $"--packages \"{artifactsPaths.PackagesDirectoryName}\"")
@@ -152,6 +159,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 .AppendArgument(extraArguments)
                 .AppendArgument(GetMandatoryMsBuildSettings(buildPartition.BuildConfiguration))
                 .AppendArgument(GetMsBuildBinLogArgument(buildPartition, binLogSuffix))
+                .MaybeAppendOutputPaths(artifactsPaths, true, excludeOutput)
                 .ToString();
 
         internal static string GetBuildCommand(ArtifactsPaths artifactsPaths, BuildPartition buildPartition, string extraArguments = null, string binLogSuffix = null, bool excludeOutput = false)
@@ -162,7 +170,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                 .AppendArgument(GetMandatoryMsBuildSettings(buildPartition.BuildConfiguration))
                 .AppendArgument(string.IsNullOrEmpty(artifactsPaths.PackagesDirectoryName) ? string.Empty : $"/p:NuGetPackageRoot=\"{artifactsPaths.PackagesDirectoryName}\"")
                 .AppendArgument(GetMsBuildBinLogArgument(buildPartition, binLogSuffix))
-                .MaybeAppendOutputPaths(artifactsPaths, excludeOutput)
+                .MaybeAppendOutputPaths(artifactsPaths, excludeOutput: excludeOutput)
                 .ToString();
 
         internal static string GetPublishCommand(ArtifactsPaths artifactsPaths, BuildPartition buildPartition, string extraArguments = null, string binLogSuffix = null)
@@ -248,7 +256,7 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
         // We force the project to output binaries to a new directory.
         // Specifying --output and --no-dependencies breaks the build (because the previous build was not done using the custom output path),
         // so we don't include it if we're building no-deps (only supported for integration tests).
-        internal static StringBuilder MaybeAppendOutputPaths(this StringBuilder stringBuilder, ArtifactsPaths artifactsPaths, bool excludeOutput = false)
+        internal static StringBuilder MaybeAppendOutputPaths(this StringBuilder stringBuilder, ArtifactsPaths artifactsPaths, bool isRestore = false, bool excludeOutput = false)
             => excludeOutput
                 ? stringBuilder
                 : stringBuilder
@@ -256,6 +264,6 @@ namespace BenchmarkDotNet.Toolchains.DotNetCli
                     .AppendArgument($"/p:OutDir=\"{artifactsPaths.BinariesDirectoryPath}\"")
                     // OutputPath is legacy, per-project version of OutDir. We set both just in case. https://github.com/dotnet/msbuild/issues/87
                     .AppendArgument($"/p:OutputPath=\"{artifactsPaths.BinariesDirectoryPath}\"")
-                    .AppendArgument($"--output \"{artifactsPaths.BinariesDirectoryPath}\"");
+                    .AppendArgument(isRestore ? string.Empty : $"--output \"{artifactsPaths.BinariesDirectoryPath}\"");
     }
 }
